@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nipio.fullname" . }}
+  labels:
+    {{- include "nipio.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "nipio.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "nipio.selectorLabels" . | nindent 8 }}
+    spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      serviceAccountName: {{ include "nipio.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: dns-udp
+              containerPort: 53
+              protocol: UDP
+            - name: dns-tcp
+              containerPort: 53
+              protocol: TCP
+          livenessProbe:
+            tcpSocket:
+              port: 53
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            tcpSocket:
+              port: 53
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          env:
+            - name: NIPIO_DOMAIN
+              value: "{{ .Values.nipio.domain }}"
+            - name: NIPIO_TTL
+              value: "{{ .Values.nipio.ttl }}"
+            - name: NIPIO_NONWILD_DEFAULT_IP
+              value: "{{ .Values.nipio.nonwild_default_ip }}"
+            - name: NIPIO_SOA_ID
+              value: "{{ .Values.nipio.soa_serial }}"
+            - name: NIPIO_SOA_HOSTMASTER
+              value: "{{ .Values.nipio.soa_hostmaster }}"
+            - name: NIPIO_SOA_NS
+              value: "{{ .Values.nipio.soa_ns }}"
+            - name: NIPIO_NAMESERVERS
+              value: {{ include "nipio.nameservers" .Values.nipio.nameservers }}
+            - name: NIPIO_BLACKLIST
+              value: {{ include "nipio.blacklist" .Values.nipio.blacklist }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
